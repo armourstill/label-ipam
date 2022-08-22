@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package ipam;
+
+option go_package = "github.com/armourstill/label-ipam/ipam";
+
+// IP地址描述符
+message descriptor {
+    map<string, string> labels = 1;
+}
+
+// IP地址桶，用于多个IP独立存储，最大IP容量上限
+message bucket {
+    map<string, descriptor> used = 1;
+}
+
+message zone {
+    string literal = 1;
+    map<string, string> labels = 2;
+    // bucket的索引映射，其中key为bucket的索引
+    map<string, bucket> buckets = 3;
+    map<string, descriptor> reserved = 4;
+}
+
+message block {
+    map<string, string> labels = 1;
+    repeated zone zones = 2;
+}
