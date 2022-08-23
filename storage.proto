@@ -7,6 +7,7 @@ option go_package = "github.com/armourstill/label-ipam/ipam";
 // IP地址描述符
 message descriptor {
     map<string, string> labels = 1;
+    uint32 ref_count = 2;
 }
 
 // IP地址桶，用于多个IP独立存储，最大IP容量上限
