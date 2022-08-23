@@ -241,13 +241,10 @@ func (i *ipam) AllocAddrSpecific(ctx context.Context, specific string, labels La
 		if !zone.Contains(ip) {
 			continue
 		}
-		if zone.IPUsed(ip) {
-			return fmt.Errorf("IP %s is in use", specific)
-		}
 		if zone.IPReserved(ip) {
 			return fmt.Errorf("IP %s already reserved", specific)
 		}
-		zone.AlocAddrWithCreateBucket(i.prefix, ip, &Descriptor{Labels: labels.Copy()})
+		zone.AlocAddrWithCreateBucket(i.prefix, ip, labels)
 		return nil
 	}
 	return fmt.Errorf("IP %s is not handled", specific)
@@ -262,7 +259,7 @@ func (i *ipam) AllocAddrNext(ctx context.Context, labels LabelMap) (net.IP, erro
 			if zone.IPUsed(ip) || zone.IPReserved(ip) {
 				continue
 			}
-			zone.AlocAddrWithCreateBucket(i.prefix, ip, &Descriptor{Labels: labels.Copy()})
+			zone.AlocAddrWithCreateBucket(i.prefix, ip, labels)
 			return ip, nil
 		}
 	}
@@ -310,7 +307,7 @@ func (i *ipam) ReleaseAddr(ctx context.Context, specific string) error {
 			continue
 		}
 		// 无差别尝试移除
-		zone.RemoveAddrWithDeleteBucket(ip)
+		zone.ReleaseAddrWithDeleteBucket(ip)
 		return nil
 	}
 	return fmt.Errorf("IP %s is not handled", specific)

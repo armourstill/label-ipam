@@ -39,13 +39,13 @@ type IPAM interface {
 	// 列出指定Zone的所有标签并返回Zone是否存在
 	ZoneLabels(ctx context.Context, literal string) (LabelMap, bool)
 
-	// 分配一个指定的可用IP，若有标签，则一并填写标签
+	// 分配一个指定的IP，允许指定已使用的IP（内部引用计数加1），若有标签，则一并填写（覆盖）标签
 	AllocAddrSpecific(ctx context.Context, specific string, labels LabelMap) error
-	// 从随机Zone中分配一个可用IP，若有标签，则一并填写标签
+	// 从随机Zone的未使用IP中分配一个，若有标签，则一并填写标签
 	AllocAddrNext(ctx context.Context, labels LabelMap) (net.IP, error)
 	// 保留一个IP，该IP必须未分配
 	ReserveAddr(ctx context.Context, specific string, labels LabelMap) error
-	// 释放一个IP，该IP应当已分配或已保留
+	// 释放一个IP，该IP应当已分配或已保留，允许多次释放一个被多次申请的IP（内部引用计数减1）
 	ReleaseAddr(ctx context.Context, specific string) error
 	// 设置IP地址的标签，若IP格式错误或地址未分配/未保留则报错
 	SetAddrLabel(ctx context.Context, specific, key, value string) error

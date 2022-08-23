@@ -10,67 +10,92 @@ func TestBasic(t *testing.T) {
 	ctx := context.TODO()
 
 	// 创建ipam实例
-	ipam := New("test", nil)
+	ipm := New("test", nil)
 
 	// 添加zone，相当于添加IP段
-	if err := ipam.AddZone(ctx, "192.168.1.0/24", true); err != nil {
+	if err := ipm.AddZone(ctx, "192.168.1.0/24", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AddZone(ctx, "FE80::12", true); err != nil {
+	if err := ipm.AddZone(ctx, "FE80::12", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AddZone(ctx, "FE80::30-FE80::1:30", true); err != nil {
+	if err := ipm.AddZone(ctx, "FE80::30-FE80::1:30", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AddZone(ctx, "192.168.3.0-192.168.3.10", true); err != nil {
+	if err := ipm.AddZone(ctx, "192.168.3.0-192.168.3.10", true); err != nil {
 		t.Fatal(err)
 	}
 
 	// 申请/保留IP地址
-	if err := ipam.AllocAddrSpecific(ctx, "192.168.1.1", nil); err != nil {
+	ipv4A := "192.168.1.1"
+	ipv4B := "192.168.3.3"
+	ipv4C := "192.168.1.0"
+	ipv6A := "FE80::12"
+	ipv6B := "FE80::1:12"
+	if err := ipm.AllocAddrSpecific(ctx, ipv4A, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AllocAddrSpecific(ctx, "FE80::12", nil); err != nil {
+	if err := ipm.AllocAddrSpecific(ctx, ipv4B, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AllocAddrSpecific(ctx, "FE80::1:12", nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := ipam.AllocAddrSpecific(ctx, "192.168.3.3", nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := ipam.AllocAddrSpecific(ctx, "192.168.1.0", nil); err == nil {
+	if err := ipm.AllocAddrSpecific(ctx, ipv4C, nil); err == nil {
 		t.Fatal("Target IP should not be acquired")
 	}
-	result, err := ipam.AllocAddrNext(ctx, nil)
+	if err := ipm.AllocAddrSpecific(ctx, ipv6A, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipm.AllocAddrSpecific(ctx, ipv6B, nil); err != nil {
+		t.Fatal(err)
+	}
+	result, err := ipm.AllocAddrNext(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.ReserveAddr(ctx, "192.168.1.100", nil); err != nil {
+
+	// 重复申请
+	if err := ipm.AllocAddrSpecific(ctx, ipv4A, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.AllocAddrSpecific(ctx, "192.168.1.100", nil); err == nil {
+	var desc *Descriptor
+	for _, bucket := range ipm.(*ipam).zones["192.168.1.0/24"].storage.Buckets {
+		if d, ok := bucket.Used[ipv4A]; ok {
+			desc = d
+			break
+		}
+	}
+	if desc == nil {
+		t.Fatalf("%s should be allocated", ipv4A)
+	}
+	if desc.RefCount != 2 {
+		t.Fatalf("%s should be allocated 2 times", ipv4A)
+	}
+
+	// 地址保留
+	if err := ipm.ReserveAddr(ctx, "192.168.1.100", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipm.AllocAddrSpecific(ctx, "192.168.1.100", nil); err == nil {
 		t.Fatal("Target IP should be resversed")
 	}
 
 	// 释放IP地址
-	if err := ipam.ReleaseAddr(ctx, result.String()); err != nil {
+	if err := ipm.ReleaseAddr(ctx, result.String()); err != nil {
 		t.Fatal(err)
 	}
 	// 从IP地址查询所属zone，即IP段
-	if literal := ipam.FindLiteral(ctx, "192.168.3.0"); len(literal) <= 0 {
+	if literal := ipm.FindLiteral(ctx, "192.168.3.0"); len(literal) <= 0 {
 		t.Fatal("Target IP literal should be found")
 	}
 	// 列出所有zone，即所有IP段
-	if len(ipam.Literals(ctx)) != 4 {
+	if len(ipm.Literals(ctx)) != 4 {
 		t.Fatal("IPAM should have 4 zones")
 	}
 
 	// 移除zone
-	if err := ipam.RemoveZone(ctx, "192.168.1.0/24"); err != nil {
+	if err := ipm.RemoveZone(ctx, "192.168.1.0/24"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.ReleaseAddr(ctx, "192.168.1.1"); err == nil {
+	if err := ipm.ReleaseAddr(ctx, "192.168.1.1"); err == nil {
 		t.Fatal("Target IP should not be handled")
 	}
 }

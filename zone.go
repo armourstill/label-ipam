@@ -82,10 +82,18 @@ func (z *zone) ReserveAddr(ip net.IP, desc *Descriptor) {
 
 }
 
-func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, desc *Descriptor) {
+func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMap) {
 	var bucket *Bucket
 	for _, b := range z.storage.Buckets {
-		if len(b.Used) < AddrNumPerBucket {
+		// 如果找到，直接加ref并且更新label后就返回
+		if desc, ok := b.Used[ip.String()]; ok {
+			desc.RefCount++
+			for k, v := range labels {
+				desc.Labels[k] = v
+			}
+			return
+		}
+		if len(b.Used) < AddrNumPerBucket && bucket == nil {
 			bucket = b
 			break
 		}
@@ -95,18 +103,27 @@ func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, desc *Descript
 		key := prefix + "/" + z.storage.Literal + "/" + strconv.Itoa(len(z.storage.Buckets))
 		z.storage.Buckets[key] = bucket
 	}
+	desc := &Descriptor{RefCount: 1}
+	if labels != nil {
+		desc.Labels = labels.Copy()
+	}
 	bucket.Used[ip.String()] = desc
 }
 
-func (z *zone) RemoveAddrWithDeleteBucket(ip net.IP) {
+func (z *zone) ReleaseAddrWithDeleteBucket(ip net.IP) {
 	// 先从保留IP中查询
 	if _, reserved := z.storage.Reserved[ip.String()]; reserved {
 		delete(z.storage.Reserved, ip.String())
 		return
 	}
 	for key, bucket := range z.storage.Buckets {
-		if _, ok := bucket.Used[ip.String()]; !ok {
+		desc, ok := bucket.Used[ip.String()]
+		if !ok {
 			continue
+		}
+		desc.RefCount--
+		if desc.RefCount > 0 {
+			return
 		}
 		delete(bucket.Used, ip.String())
 		if len(bucket.Used) <= 0 {
