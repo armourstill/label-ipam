@@ -164,7 +164,7 @@ func TestDumpLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dumpedAddrs, err := ipam1.DumpZoneAddrs(ctx, literal)
+	dumpedAddrs, err := ipam1.DumpZoneAddrs(ctx, literal, false)
 	if err != nil {
 		t.Fatal(err)
 	}

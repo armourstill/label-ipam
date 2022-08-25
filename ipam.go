@@ -63,7 +63,7 @@ type IPAM interface {
 	// fat为true时，将会包含已分配的IP信息
 	Dump(ctx context.Context, fat bool) ([]byte, error)
 	// 将Zone中已分配的IP导出为分散的字节码映射
-	DumpZoneAddrs(ctx context.Context, literal string) (map[string][]byte, error)
+	DumpZoneAddrs(ctx context.Context, literal string, onlyKeys bool) (map[string][]byte, error)
 	// 从Dump导出的字节码中加载全部Zone，IPAM中已有的同名Zone将会被覆盖
 	Load(ctx context.Context, raw []byte) error
 	// 从DumpZoneAddrs导出的字节码映射中加载Zone的已分配地址

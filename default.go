@@ -424,7 +424,7 @@ func (i *ipam) Dump(ctx context.Context, fat bool) ([]byte, error) {
 	return block.Marshal()
 }
 
-func (i *ipam) DumpZoneAddrs(ctx context.Context, literal string) (map[string][]byte, error) {
+func (i *ipam) DumpZoneAddrs(ctx context.Context, literal string, onlyKeys bool) (map[string][]byte, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
@@ -432,12 +432,18 @@ func (i *ipam) DumpZoneAddrs(ctx context.Context, literal string) (map[string][]
 		return nil, fmt.Errorf("IP Lliteral %s not exists", literal)
 	}
 	result := make(map[string][]byte)
-	for key, b := range zone.storage.Buckets {
-		raw, err := b.Marshal()
-		if err != nil {
-			return nil, fmt.Errorf("Marshal IP failed: %s", err)
+	if onlyKeys {
+		for key := range zone.storage.Buckets {
+			result[key] = nil
 		}
-		result[key] = raw
+	} else {
+		for key, b := range zone.storage.Buckets {
+			raw, err := b.Marshal()
+			if err != nil {
+				return nil, fmt.Errorf("Marshal IP failed: %s", err)
+			}
+			result[key] = raw
+		}
 	}
 	return result, nil
 }
