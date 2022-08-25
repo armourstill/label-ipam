@@ -16,6 +16,9 @@ func TestBasic(t *testing.T) {
 	if err := ipm.AddZone(ctx, "192.168.1.0/24", true); err != nil {
 		t.Fatal(err)
 	}
+	if err := ipm.AddZone(ctx, "192.168.1.0/28", true); err == nil {
+		t.Fatal("Literal should be overlapped")
+	}
 	if err := ipm.AddZone(ctx, "FE80::12", true); err != nil {
 		t.Fatal(err)
 	}
@@ -176,6 +179,15 @@ func TestDumpLoad(t *testing.T) {
 	ipam2 := New("test", nil)
 	if err := ipam2.Load(ctx, rawBlock); err != nil {
 		t.Fatal(err)
+	}
+	for _, literal := range ipam2.Literals(ctx) {
+		onlyKeys, err := ipam2.DumpZoneAddrs(ctx, literal, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(onlyKeys) != 2 {
+			t.Fatal("2 buckets should be dumped")
+		}
 	}
 	if err := ipam2.LoadZoneAddrs(ctx, literal, dumpedAddrs); err != nil {
 		t.Fatal(err)

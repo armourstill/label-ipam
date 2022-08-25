@@ -52,7 +52,17 @@ func (i *ipam) Labels(ctx context.Context) LabelMap {
 	return i.labels.Copy()
 }
 
-func (i *ipam) addZoneSingle(ip net.IP, lazy bool) *ipam {
+func (i *ipam) overlappedWith(zone *zone) bool {
+	for _, z := range i.zones {
+		if z.start.Cmp(zone.end) > 0 || z.end.Cmp(zone.start) < 0 {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (i *ipam) createZoneSingle(ip net.IP, lazy bool) *zone {
 	ipBigInt := IPToBigInt(ip)
 	zone := &zone{
 		start: ipBigInt,
@@ -69,11 +79,10 @@ func (i *ipam) addZoneSingle(ip net.IP, lazy bool) *ipam {
 	} else {
 		zone.version = 6
 	}
-	i.zones[zone.storage.Literal] = zone
-	return i
+	return zone
 }
 
-func (i *ipam) addZoneCIDR(cidr *net.IPNet, lazy bool) *ipam {
+func (i *ipam) createZoneCIDR(cidr *net.IPNet, lazy bool) *zone {
 	// 一些准备工作
 	zone := &zone{
 		lazy: lazy,
@@ -96,11 +105,10 @@ func (i *ipam) addZoneCIDR(cidr *net.IPNet, lazy bool) *ipam {
 	}
 	zone.start = new(big.Int).Add(local, one)                         // start避开0地址
 	zone.end = new(big.Int).Sub(new(big.Int).Add(local, offset), one) // end避开广播地址
-	i.zones[zone.storage.Literal] = zone
-	return i
+	return zone
 }
 
-func (i *ipam) addZoneRange(low, high net.IP, lazy bool) *ipam {
+func (i *ipam) createZoneRange(low, high net.IP, lazy bool) *zone {
 	start := IPToBigInt(low)
 	end := IPToBigInt(high)
 	zone := &zone{
@@ -118,8 +126,7 @@ func (i *ipam) addZoneRange(low, high net.IP, lazy bool) *ipam {
 	} else {
 		zone.version = 6
 	}
-	i.zones[zone.storage.Literal] = zone
-	return i
+	return zone
 }
 
 func (i *ipam) AddZone(ctx context.Context, literal string, lazy bool) error {
@@ -130,14 +137,15 @@ func (i *ipam) AddZone(ctx context.Context, literal string, lazy bool) error {
 		return fmt.Errorf("Zone literal %s already exitst", literal)
 	}
 
+	var zone *zone
 	// 根据literal的格式不同有不同的zone生成方式
 	if single := net.ParseIP(literal); single != nil {
-		i.addZoneSingle(single, lazy)
+		zone = i.createZoneSingle(single, lazy)
 	} else if ip, ipnet, err := net.ParseCIDR(literal); err == nil {
 		if !ip.Equal(ipnet.IP) {
 			return errors.New("Invalid CIDR network value")
 		}
-		i.addZoneCIDR(ipnet, lazy)
+		zone = i.createZoneCIDR(ipnet, lazy)
 	} else if pair := strings.Split(literal, "-"); len(pair) == 2 {
 		low := net.ParseIP(pair[0])
 		high := net.ParseIP(pair[1])
@@ -150,10 +158,14 @@ func (i *ipam) AddZone(ctx context.Context, literal string, lazy bool) error {
 		if IPToBigInt(low).Cmp(IPToBigInt(high)) >= 0 {
 			return errors.New("The left IP should be less than the right one")
 		}
-		i.addZoneRange(low, high, lazy)
+		zone = i.createZoneRange(low, high, lazy)
 	} else {
 		return errors.New("Invalid format")
 	}
+	if i.overlappedWith(zone) {
+		return errors.New("Literal overlapped")
+	}
+	i.zones[zone.storage.Literal] = zone
 
 	return nil
 }
