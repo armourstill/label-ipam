@@ -239,6 +239,32 @@ func (i *ipam) ZoneLabels(ctx context.Context, literal string) (LabelMap, bool) 
 	return LabelMap(zone.storage.Labels).Copy(), zoneOk
 }
 
+func (i *ipam) UsedAddrs(ctx context.Context) []string {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+	result := make([]string, 0)
+	for _, zone := range i.zones {
+		for _, b := range zone.storage.Buckets {
+			for addr := range b.Used {
+				result = append(result, addr)
+			}
+		}
+	}
+	return result
+}
+
+func (i *ipam) ReservedAddrs(ctx context.Context) []string {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+	result := make([]string, 0)
+	for _, zone := range i.zones {
+		for addr := range zone.storage.Reserved {
+			result = append(result, addr)
+		}
+	}
+	return result
+}
+
 func (i *ipam) AllocAddrSpecific(ctx context.Context, specific string, labels LabelMap) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {

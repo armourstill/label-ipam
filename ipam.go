@@ -39,6 +39,10 @@ type IPAM interface {
 	// 列出指定Zone的所有标签并返回Zone是否存在
 	ZoneLabels(ctx context.Context, literal string) (LabelMap, bool)
 
+	// 全部已使用的IP地址
+	UsedAddrs(ctx context.Context) []string
+	// 全部已保留的IP地址
+	ReservedAddrs(ctx context.Context) []string
 	// 分配一个指定的IP，允许指定已使用的IP（内部引用计数加1），若有标签，则一并填写（覆盖）标签
 	AllocAddrSpecific(ctx context.Context, specific string, labels LabelMap) error
 	// 从随机Zone的未使用IP中分配一个，若有标签，则一并填写标签

@@ -101,6 +101,10 @@ func TestBasic(t *testing.T) {
 	if err := ipm.ReleaseAddr(ctx, "192.168.1.1"); err == nil {
 		t.Fatal("Target IP should not be handled")
 	}
+
+	if len(ipm.UsedAddrs(ctx)) != 3 {
+		t.Fatal("There should be 3 IPs remained")
+	}
 }
 
 func TestLabel(t *testing.T) {
