@@ -204,7 +204,7 @@ func TestDumpLoad(t *testing.T) {
 			t.Fatal("2 buckets should be dumped")
 		}
 	}
-	if err := ipam2.LoadZoneAddrs(ctx, literal, dumpedAddrs); err != nil {
+	if err := ipam2.LoadZoneAddrs(ctx, literal, dumpedAddrs, false); err != nil {
 		t.Fatal(err)
 	}
 	bigIdle2, _ := big.NewInt(0).SetString(ipam2.IdleCount(ctx), 10)
