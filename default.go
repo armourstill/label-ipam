@@ -601,7 +601,7 @@ func (i *ipam) Load(ctx context.Context, raw []byte) error {
 	return nil
 }
 
-func (i *ipam) LoadZoneAddrs(ctx context.Context, literal string, addrs map[string][]byte) error {
+func (i *ipam) LoadZoneAddrs(ctx context.Context, literal string, addrs map[string][]byte, force bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
@@ -610,7 +610,10 @@ func (i *ipam) LoadZoneAddrs(ctx context.Context, literal string, addrs map[stri
 	}
 	temp := make(map[string]*Bucket)
 	for key, raw := range addrs {
-		if _, ok := zone.storage.Buckets[key]; !ok {
+		if !strings.HasPrefix(key, i.prefix) {
+			continue
+		}
+		if _, ok := zone.storage.Buckets[key]; !ok && !force {
 			// 如果key不属于该zone，则跳过
 			continue
 		}

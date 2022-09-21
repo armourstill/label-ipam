@@ -75,5 +75,7 @@ type IPAM interface {
 	// 从DumpZoneAddrs导出的字节码映射中加载Zone的已分配地址
 	//
 	// 若addrs的key不包含在该Zone中，则该key与其对应的地址将被忽略
-	LoadZoneAddrs(ctx context.Context, literal string, addrs map[string][]byte) error
+	//
+	// 若force为true，即使addrs的key在Zone中找不到，也仍会加载
+	LoadZoneAddrs(ctx context.Context, literal string, addrs map[string][]byte, force bool) error
 }
