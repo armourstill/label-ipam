@@ -511,29 +511,43 @@ func (i *ipam) DumpZoneAddrs(ctx context.Context, literal string, onlyKeys bool)
 }
 
 func (i *ipam) loadZoneSingle(z *Zone, lazy bool) *ipam {
-	ipBigInt := IPToBigInt(net.ParseIP(z.Literal))
-	zone := &zone{start: ipBigInt, end: ipBigInt, lazy: lazy, storage: z}
+	ip := net.ParseIP(z.Literal)
+	ipBigInt := IPToBigInt(ip)
+	zone := &zone{start: ipBigInt, end: ipBigInt, lazy: lazy, storage: z, version: 6}
+	if IsIPv4(ip) {
+		zone.version = 4
+	}
 	i.zones[z.Literal] = zone
 	return i
 }
 
 func (i *ipam) loadZoneCIDR(z *Zone, lazy bool) *ipam {
-	_, cidr, _ := net.ParseCIDR(z.Literal)
+	ip, cidr, _ := net.ParseCIDR(z.Literal)
 	ones, _ := cidr.Mask.Size()
 	local := IPToBigInt(cidr.IP)
-	offset := new(big.Int).Sub(new(big.Int).Lsh(one, uint(128-ones)), one)
+	lsh := uint(128 - ones)
+	version := uint8(6)
+	if IsIPv4(ip) {
+		lsh = uint(32 - ones)
+		version = 4
+	}
+	offset := new(big.Int).Sub(new(big.Int).Lsh(one, lsh), one)
 	start := new(big.Int).Add(local, one)
 	end := new(big.Int).Sub(new(big.Int).Add(local, offset), one)
-	zone := &zone{start: start, end: end, lazy: lazy, storage: z}
+	zone := &zone{start: start, end: end, lazy: lazy, storage: z, version: version}
 	i.zones[z.Literal] = zone
 	return i
 }
 
 func (i *ipam) loadZoneRange(z *Zone, lazy bool) *ipam {
 	pair := strings.Split(z.Literal, "-")
-	start := IPToBigInt(net.ParseIP(pair[0]))
-	end := IPToBigInt(net.ParseIP(pair[1]))
+	ip0, ip1 := net.ParseIP(pair[0]), net.ParseIP(pair[1])
+	start := IPToBigInt(ip0)
+	end := IPToBigInt(ip1)
 	zone := &zone{start: start, end: end, lazy: lazy, storage: z}
+	if IsIPv4(ip0) {
+		zone.version = 4
+	}
 	i.zones[z.Literal] = zone
 	return i
 }
