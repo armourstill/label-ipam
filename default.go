@@ -621,6 +621,9 @@ func (i *ipam) LoadZoneAddrs(ctx context.Context, literal string, addrs map[stri
 		if err := bucket.Unmarshal(raw); err != nil {
 			return fmt.Errorf("Unmarshal IP failed: %s", err)
 		}
+		if bucket.Used == nil {
+			bucket.Used = make(map[string]*Descriptor)
+		}
 		temp[key] = bucket
 	}
 	for key, b := range temp {
