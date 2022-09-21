@@ -2,6 +2,8 @@ package ipam
 
 import (
 	"context"
+	"math/big"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -162,7 +164,7 @@ func TestLabel(t *testing.T) {
 
 func TestDumpLoad(t *testing.T) {
 	ctx := context.TODO()
-	literal := "FE08::-FE20::"
+	literal := "FE08::-FE09::"
 	AddrNumPerBucket = 64
 	defer func() {
 		AddrNumPerBucket = 4096
@@ -171,7 +173,9 @@ func TestDumpLoad(t *testing.T) {
 	// Dump
 	ipam1 := New("test", nil)
 	ipam1.AddZone(ctx, literal, true)
-	for i := 0; i < AddrNumPerBucket*2; i++ {
+	bigIdle1, _ := big.NewInt(0).SetString(ipam1.IdleCount(ctx), 10)
+	allocNum := AddrNumPerBucket * 2
+	for i := 0; i < allocNum; i++ {
 		ipam1.AllocAddrNext(ctx, nil)
 	}
 	rawBlock, err := ipam1.Dump(ctx, false)
@@ -202,6 +206,10 @@ func TestDumpLoad(t *testing.T) {
 	}
 	if err := ipam2.LoadZoneAddrs(ctx, literal, dumpedAddrs); err != nil {
 		t.Fatal(err)
+	}
+	bigIdle2, _ := big.NewInt(0).SetString(ipam2.IdleCount(ctx), 10)
+	if bigIdle1.Sub(bigIdle1, bigIdle2).String() != strconv.Itoa(allocNum) {
+		t.Fatalf("Wrong idle count %s", bigIdle2.String())
 	}
 	for _, b := range ipam2.(*ipam).zones[strings.ToLower(literal)].storage.Buckets {
 		if len(b.Used) != AddrNumPerBucket {
