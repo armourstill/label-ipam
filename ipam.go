@@ -39,6 +39,8 @@ type IPAM interface {
 	// 列出指定Zone的所有标签并返回Zone是否存在
 	ZoneLabels(ctx context.Context, literal string) (LabelMap, bool)
 
+	// 以string表示的当前空闲的地址数量，即`全部地址数量 - 已用地址数量 - 保留地址数量`
+	IdleCount(ctx context.Context) string
 	// 全部已使用的IP地址
 	UsedAddrs(ctx context.Context) []string
 	// 全部已保留的IP地址
