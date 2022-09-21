@@ -239,9 +239,22 @@ func (i *ipam) ZoneLabels(ctx context.Context, literal string) (LabelMap, bool) 
 	return LabelMap(zone.storage.Labels).Copy(), zoneOk
 }
 
-func (i *ipam) UsedAddrs(ctx context.Context) []string {
+func (i *ipam) IdleCount(ctx context.Context) string {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
+	usedCount := big.NewInt(int64(len(i.usedAddrs(ctx))))
+	reservedCount := big.NewInt(int64(len(i.reservedAddrs(ctx))))
+	totalCount := big.NewInt(0)
+	for _, zone := range i.zones {
+		zoneTotal := big.NewInt(0).Sub(zone.end, zone.start)
+		zoneTotal.Add(zoneTotal, big.NewInt(1))
+		totalCount.Add(totalCount, zoneTotal)
+	}
+	return totalCount.Sub(totalCount, usedCount).Sub(totalCount, reservedCount).String()
+}
+
+// FIXME: 对于IPv6地址池，存在数量超出slice容量上限的风险
+func (i *ipam) usedAddrs(ctx context.Context) []string {
 	result := make([]string, 0)
 	for _, zone := range i.zones {
 		for _, b := range zone.storage.Buckets {
@@ -253,9 +266,14 @@ func (i *ipam) UsedAddrs(ctx context.Context) []string {
 	return result
 }
 
-func (i *ipam) ReservedAddrs(ctx context.Context) []string {
+func (i *ipam) UsedAddrs(ctx context.Context) []string {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
+	return i.usedAddrs(ctx)
+}
+
+// FIXME: 对于IPv6地址池，存在数量超出slice容量上限的风险
+func (i *ipam) reservedAddrs(ctx context.Context) []string {
 	result := make([]string, 0)
 	for _, zone := range i.zones {
 		for addr := range zone.storage.Reserved {
@@ -263,6 +281,12 @@ func (i *ipam) ReservedAddrs(ctx context.Context) []string {
 		}
 	}
 	return result
+}
+
+func (i *ipam) ReservedAddrs(ctx context.Context) []string {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+	return i.reservedAddrs(ctx)
 }
 
 func (i *ipam) AllocAddrSpecific(ctx context.Context, specific string, labels LabelMap) error {

@@ -16,11 +16,17 @@ func TestBasic(t *testing.T) {
 	if err := ipm.AddZone(ctx, "192.168.1.0/24", true); err != nil {
 		t.Fatal(err)
 	}
+	if idleCount := ipm.IdleCount(ctx); idleCount != "254" {
+		t.Fatalf("Wrong idle count %s", idleCount)
+	}
 	if err := ipm.AddZone(ctx, "192.168.1.0/28", true); err == nil {
 		t.Fatal("Literal should be overlapped")
 	}
 	if err := ipm.AddZone(ctx, "FE80::12", true); err != nil {
 		t.Fatal(err)
+	}
+	if idleCount := ipm.IdleCount(ctx); idleCount != "255" {
+		t.Fatalf("Wrong idle count %s", idleCount)
 	}
 	if err := ipm.AddZone(ctx, "FE80::30-FE80::1:30", true); err != nil {
 		t.Fatal(err)
@@ -102,6 +108,7 @@ func TestBasic(t *testing.T) {
 		t.Fatal("Target IP should not be handled")
 	}
 
+	// 统计类信息
 	if len(ipm.UsedAddrs(ctx)) != 3 {
 		t.Fatal("There should be 3 IPs remained")
 	}
