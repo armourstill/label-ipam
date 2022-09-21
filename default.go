@@ -588,6 +588,12 @@ func (i *ipam) Load(ctx context.Context, raw []byte) error {
 		return err
 	}
 	for _, z := range block.Zones {
+		if z.Buckets == nil {
+			z.Buckets = make(map[string]*Bucket)
+		}
+		if z.Reserved == nil {
+			z.Reserved = make(map[string]*Descriptor)
+		}
 		if err := i.loadZone(z, false); err != nil {
 			return err
 		}

@@ -84,6 +84,9 @@ func (z *zone) ReserveAddr(ip net.IP, desc *Descriptor) {
 
 func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMap) {
 	var bucket *Bucket
+	if z.storage.Buckets == nil {
+		z.storage.Buckets = make(map[string]*Bucket)
+	}
 	for _, b := range z.storage.Buckets {
 		// 如果找到，直接加ref并且更新label后就返回
 		if desc, ok := b.Used[ip.String()]; ok {
