@@ -79,7 +79,7 @@ func (z *zone) ReserveAddr(ip net.IP, desc *Descriptor) {
 	if z.storage.Reserved == nil {
 		z.storage.Reserved = make(map[string]*Descriptor)
 	}
-
+	// TODO
 }
 
 func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMap) {
@@ -88,7 +88,7 @@ func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMa
 		z.storage.Buckets = make(map[string]*Bucket)
 	}
 	for _, b := range z.storage.Buckets {
-		// 如果找到，直接加ref并且更新label后就返回
+		// if found, increase RefCount and update Labels
 		if desc, ok := b.Used[ip.String()]; ok {
 			desc.RefCount++
 			for k, v := range labels {
@@ -96,7 +96,7 @@ func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMa
 			}
 			return
 		}
-		if len(b.Used) < AddrNumPerBucket && bucket == nil {
+		if len(b.Used) < AddrNumPerBucket {
 			bucket = b
 			break
 		}
@@ -114,7 +114,7 @@ func (z *zone) AlocAddrWithCreateBucket(prefix string, ip net.IP, labels LabelMa
 }
 
 func (z *zone) ReleaseAddrWithDeleteBucket(ip net.IP) {
-	// 先从保留IP中查询
+	// query from Reserved at first
 	if _, reserved := z.storage.Reserved[ip.String()]; reserved {
 		delete(z.storage.Reserved, ip.String())
 		return
