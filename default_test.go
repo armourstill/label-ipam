@@ -1,7 +1,6 @@
 package ipam
 
 import (
-	"context"
 	"math/big"
 	"strconv"
 	"strings"
@@ -9,62 +8,57 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	ctx := context.TODO()
-
-	// 创建ipam实例
 	ipm := New("test", nil)
 
-	// 添加zone，相当于添加IP段
-	if err := ipm.AddZone(ctx, "192.168.1.0/24", true); err != nil {
+	if err := ipm.AddZone("192.168.1.0/24", true); err != nil {
 		t.Fatal(err)
 	}
-	if idleCount := ipm.IdleCount(ctx); idleCount != "254" {
+	if idleCount := ipm.IdleCount(); idleCount != "254" {
 		t.Fatalf("Wrong idle count %s", idleCount)
 	}
-	if err := ipm.AddZone(ctx, "192.168.1.0/28", true); err == nil {
+	if err := ipm.AddZone("192.168.1.0/28", true); err == nil {
 		t.Fatal("Literal should be overlapped")
 	}
-	if err := ipm.AddZone(ctx, "FE80::12", true); err != nil {
+	if err := ipm.AddZone("FE80::12", true); err != nil {
 		t.Fatal(err)
 	}
-	if idleCount := ipm.IdleCount(ctx); idleCount != "255" {
+	if idleCount := ipm.IdleCount(); idleCount != "255" {
 		t.Fatalf("Wrong idle count %s", idleCount)
 	}
-	if err := ipm.AddZone(ctx, "FE80::30-FE80::1:30", true); err != nil {
+	if err := ipm.AddZone("FE80::30-FE80::1:30", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.AddZone(ctx, "192.168.3.0-192.168.3.10", true); err != nil {
+	if err := ipm.AddZone("192.168.3.0-192.168.3.10", true); err != nil {
 		t.Fatal(err)
 	}
 
-	// 申请/保留IP地址
 	ipv4A := "192.168.1.1"
 	ipv4B := "192.168.3.3"
 	ipv4C := "192.168.1.0"
 	ipv6A := "FE80::12"
 	ipv6B := "FE80::1:12"
-	if err := ipm.AllocAddrSpecific(ctx, ipv4A, nil); err != nil {
+	if err := ipm.AllocAddrSpecific(ipv4A, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.AllocAddrSpecific(ctx, ipv4B, nil); err != nil {
+	if err := ipm.AllocAddrSpecific(ipv4B, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.AllocAddrSpecific(ctx, ipv4C, nil); err == nil {
+	if err := ipm.AllocAddrSpecific(ipv4C, nil); err == nil {
 		t.Fatal("Target IP should not be acquired")
 	}
-	if err := ipm.AllocAddrSpecific(ctx, ipv6A, nil); err != nil {
+	if err := ipm.AllocAddrSpecific(ipv6A, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.AllocAddrSpecific(ctx, ipv6B, nil); err != nil {
+	if err := ipm.AllocAddrSpecific(ipv6B, nil); err != nil {
 		t.Fatal(err)
 	}
-	result, err := ipm.AllocAddrNext(ctx, nil)
+	result, err := ipm.AllocAddrNext(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// 重复申请
-	if err := ipm.AllocAddrSpecific(ctx, ipv4A, nil); err != nil {
+	// allocate twice
+	if err := ipm.AllocAddrSpecific(ipv4A, nil); err != nil {
 		t.Fatal(err)
 	}
 	var desc *Descriptor
@@ -81,108 +75,95 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("%s should be allocated 2 times", ipv4A)
 	}
 
-	// 地址保留
-	if err := ipm.ReserveAddr(ctx, "192.168.1.100", nil); err != nil {
+	if err := ipm.ReserveAddr("192.168.1.100", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.AllocAddrSpecific(ctx, "192.168.1.100", nil); err == nil {
+	if err := ipm.AllocAddrSpecific("192.168.1.100", nil); err == nil {
 		t.Fatal("Target IP should be resversed")
 	}
 
-	// 释放IP地址
-	if err := ipm.ReleaseAddr(ctx, result.String()); err != nil {
+	if err := ipm.ReleaseAddr(result.String()); err != nil {
 		t.Fatal(err)
 	}
-	// 从IP地址查询所属zone，即IP段
-	if literal := ipm.FindLiteral(ctx, "192.168.3.0"); len(literal) <= 0 {
+	if literal := ipm.FindLiteral("192.168.3.0"); len(literal) <= 0 {
 		t.Fatal("Target IP literal should be found")
 	}
-	// 列出所有zone，即所有IP段
-	if len(ipm.Literals(ctx)) != 4 {
+	if len(ipm.Literals()) != 4 {
 		t.Fatal("IPAM should have 4 zones")
 	}
 
-	// 移除zone
-	if err := ipm.RemoveZone(ctx, "192.168.1.0/24"); err != nil {
+	if err := ipm.RemoveZone("192.168.1.0/24"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipm.ReleaseAddr(ctx, "192.168.1.1"); err == nil {
+	if err := ipm.ReleaseAddr("192.168.1.1"); err == nil {
 		t.Fatal("Target IP should not be handled")
 	}
 
-	// 统计类信息
-	if len(ipm.UsedAddrs(ctx)) != 3 {
+	if len(ipm.UsedAddrs()) != 3 {
 		t.Fatal("There should be 3 IPs remained")
 	}
 }
 
 func TestLabel(t *testing.T) {
-	ctx := context.TODO()
 	foo, bar, bar2 := "foo", "bar", "bar2"
 	m := map[string]string{foo: bar}
 
-	// 创建ipam实例
 	ipam := New("test", m)
-	if ipam.Labels(ctx)[foo] != bar {
+	if ipam.Labels()[foo] != bar {
 		t.Fatal("Wrong IPAM label value")
 	}
-	ipam.SetLabel(ctx, foo, bar2)
-	if value, _ := ipam.RemoveLabel(ctx, foo); value != bar2 {
+	ipam.SetLabel(foo, bar2)
+	if value, _ := ipam.RemoveLabel(foo); value != bar2 {
 		t.Fatal("Wrong IPAM label value from removing a key")
 	}
 
 	literal := "192.168.1.0/24"
-	// 添加zone，相当于添加IP段
-	if err := ipam.AddZone(ctx, literal, true); err != nil {
+	if err := ipam.AddZone(literal, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := ipam.SetZoneLabel(ctx, literal, foo, bar); err != nil {
+	if err := ipam.SetZoneLabel(literal, foo, bar); err != nil {
 		t.Fatal(err)
 	}
-	if value, _ := ipam.RemoveZoneLabel(ctx, literal, foo); value != bar {
+	if value, _ := ipam.RemoveZoneLabel(literal, foo); value != bar {
 		t.Fatal("Wrong zone label value from removing a key")
 	}
 
 	specific := "192.168.1.1"
-	// 申请IP地址，并携带标签
-	if err := ipam.AllocAddrSpecific(ctx, specific, m); err != nil {
+	if err := ipam.AllocAddrSpecific(specific, m); err != nil {
 		t.Fatal(err)
 	}
-	// 设置地址标签并覆盖key
-	ipam.SetAddrLabel(ctx, specific, foo, bar2)
-	labels, _ := ipam.AddrLabels(ctx, specific)
+	ipam.SetAddrLabel(specific, foo, bar2)
+	labels, _ := ipam.AddrLabels(specific)
 	if len(labels) <= 0 {
 		t.Fatalf("IP %s has no label", specific)
 	}
 	if value := labels[foo]; value != bar2 {
 		t.Fatal("Wrong IP label value")
 	}
-	if err := ipam.RemoveAddrLabel(ctx, specific, foo); err != nil {
+	if err := ipam.RemoveAddrLabel(specific, foo); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestDumpLoad(t *testing.T) {
-	ctx := context.TODO()
+func TestDumpAndLoad(t *testing.T) {
 	literal := "FE08::-FE09::"
 	AddrNumPerBucket = 64
 	defer func() {
 		AddrNumPerBucket = 4096
 	}()
 
-	// Dump
 	ipam1 := New("test", nil)
-	ipam1.AddZone(ctx, literal, true)
-	bigIdle1, _ := big.NewInt(0).SetString(ipam1.IdleCount(ctx), 10)
+	ipam1.AddZone(literal, true)
+	bigIdle1, _ := big.NewInt(0).SetString(ipam1.IdleCount(), 10)
 	allocNum := AddrNumPerBucket * 2
 	for i := 0; i < allocNum; i++ {
-		ipam1.AllocAddrNext(ctx, nil)
+		ipam1.AllocAddrNext(nil)
 	}
-	rawBlock, err := ipam1.Dump(ctx, false)
+	rawBlock, err := ipam1.Dump(false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dumpedAddrs, err := ipam1.DumpZoneAddrs(ctx, literal, false)
+	dumpedAddrs, err := ipam1.DumpZoneAddrs(literal, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,13 +171,12 @@ func TestDumpLoad(t *testing.T) {
 		t.Fatal("2 buckets should be dumped")
 	}
 
-	// Load
 	ipam2 := New("test", nil)
-	if err := ipam2.Load(ctx, rawBlock); err != nil {
+	if err := ipam2.Load(rawBlock); err != nil {
 		t.Fatal(err)
 	}
-	for _, literal := range ipam2.Literals(ctx) {
-		onlyKeys, err := ipam2.DumpZoneAddrs(ctx, literal, true)
+	for _, literal := range ipam2.Literals() {
+		onlyKeys, err := ipam2.DumpZoneAddrs(literal, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,10 +184,10 @@ func TestDumpLoad(t *testing.T) {
 			t.Fatal("2 buckets should be dumped")
 		}
 	}
-	if err := ipam2.LoadZoneAddrs(ctx, literal, dumpedAddrs, false); err != nil {
+	if err := ipam2.LoadZoneAddrs(literal, dumpedAddrs, false); err != nil {
 		t.Fatal(err)
 	}
-	bigIdle2, _ := big.NewInt(0).SetString(ipam2.IdleCount(ctx), 10)
+	bigIdle2, _ := big.NewInt(0).SetString(ipam2.IdleCount(), 10)
 	if bigIdle1.Sub(bigIdle1, bigIdle2).String() != strconv.Itoa(allocNum) {
 		t.Fatalf("Wrong idle count %s", bigIdle2.String())
 	}
@@ -219,10 +199,9 @@ func TestDumpLoad(t *testing.T) {
 }
 
 func BenchmarkAllocNext(b *testing.B) {
-	ctx := context.TODO()
 	ipam := New("test", nil)
-	ipam.AddZone(ctx, "0.0.0.0-255.0.0.0", true)
+	ipam.AddZone("0.0.0.0-255.0.0.0", true)
 	for n := 0; n < b.N; n++ {
-		ipam.AllocAddrNext(ctx, nil)
+		ipam.AllocAddrNext(nil)
 	}
 }

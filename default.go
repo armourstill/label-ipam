@@ -1,7 +1,6 @@
 package ipam
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -29,13 +28,13 @@ func New(prefix string, labels LabelMap) IPAM {
 	return ipam
 }
 
-func (i *ipam) SetLabel(ctx context.Context, key, value string) {
+func (i *ipam) SetLabel(key, value string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	i.labels[key] = value
 }
 
-func (i *ipam) RemoveLabel(ctx context.Context, key string) (string, bool) {
+func (i *ipam) RemoveLabel(key string) (string, bool) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	value, ok := i.labels[key]
@@ -43,7 +42,7 @@ func (i *ipam) RemoveLabel(ctx context.Context, key string) (string, bool) {
 	return value, ok
 }
 
-func (i *ipam) Labels(ctx context.Context) LabelMap {
+func (i *ipam) Labels() LabelMap {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 	if i.labels == nil {
@@ -129,7 +128,7 @@ func (i *ipam) createZoneRange(low, high net.IP, lazy bool) *zone {
 	return zone
 }
 
-func (i *ipam) AddZone(ctx context.Context, literal string, lazy bool) error {
+func (i *ipam) AddZone(literal string, lazy bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -170,7 +169,7 @@ func (i *ipam) AddZone(ctx context.Context, literal string, lazy bool) error {
 	return nil
 }
 
-func (i *ipam) SetZoneLabel(ctx context.Context, literal, key, value string) error {
+func (i *ipam) SetZoneLabel(literal, key, value string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	zone, ok := i.zones[strings.ToLower(literal)]
@@ -181,7 +180,7 @@ func (i *ipam) SetZoneLabel(ctx context.Context, literal, key, value string) err
 	return nil
 }
 
-func (i *ipam) RemoveZone(ctx context.Context, literal string) error {
+func (i *ipam) RemoveZone(literal string) error {
 	if single := net.ParseIP(literal); single != nil {
 		goto del
 	} else if ip, ipnet, err := net.ParseCIDR(literal); err == nil {
@@ -202,9 +201,8 @@ func (i *ipam) RemoveZone(ctx context.Context, literal string) error {
 			return errors.New("The left IP should be less than the right one")
 		}
 		goto del
-	} else {
-		return errors.New("Invalid literal format")
 	}
+	return errors.New("Invalid literal format")
 
 del:
 	i.mutex.Lock()
@@ -214,7 +212,7 @@ del:
 	return nil
 }
 
-func (i *ipam) RemoveZoneLabel(ctx context.Context, literal, key string) (string, bool) {
+func (i *ipam) RemoveZoneLabel(literal, key string) (string, bool) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
@@ -226,7 +224,7 @@ func (i *ipam) RemoveZoneLabel(ctx context.Context, literal, key string) (string
 	return value, keyOk
 }
 
-func (i *ipam) ZoneLabels(ctx context.Context, literal string) (LabelMap, bool) {
+func (i *ipam) ZoneLabels(literal string) (LabelMap, bool) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
@@ -239,11 +237,11 @@ func (i *ipam) ZoneLabels(ctx context.Context, literal string) (LabelMap, bool) 
 	return LabelMap(zone.storage.Labels).Copy(), zoneOk
 }
 
-func (i *ipam) IdleCount(ctx context.Context) string {
+func (i *ipam) IdleCount() string {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
-	usedCount := big.NewInt(int64(len(i.usedAddrs(ctx))))
-	reservedCount := big.NewInt(int64(len(i.reservedAddrs(ctx))))
+	usedCount := big.NewInt(int64(len(i.usedAddrs())))
+	reservedCount := big.NewInt(int64(len(i.reservedAddrs())))
 	totalCount := big.NewInt(0)
 	for _, zone := range i.zones {
 		zoneTotal := big.NewInt(0).Sub(zone.end, zone.start)
@@ -253,8 +251,8 @@ func (i *ipam) IdleCount(ctx context.Context) string {
 	return totalCount.Sub(totalCount, usedCount).Sub(totalCount, reservedCount).String()
 }
 
-// FIXME: 对于IPv6地址池，存在数量超出slice容量上限的风险
-func (i *ipam) usedAddrs(ctx context.Context) []string {
+// FIXME: For IPv6 zone, there is a risk of reaching slice capacity
+func (i *ipam) usedAddrs() []string {
 	result := make([]string, 0)
 	for _, zone := range i.zones {
 		for _, b := range zone.storage.Buckets {
@@ -266,14 +264,14 @@ func (i *ipam) usedAddrs(ctx context.Context) []string {
 	return result
 }
 
-func (i *ipam) UsedAddrs(ctx context.Context) []string {
+func (i *ipam) UsedAddrs() []string {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
-	return i.usedAddrs(ctx)
+	return i.usedAddrs()
 }
 
-// FIXME: 对于IPv6地址池，存在数量超出slice容量上限的风险
-func (i *ipam) reservedAddrs(ctx context.Context) []string {
+// FIXME: For IPv6 zone, there is a risk of reaching slice capacity
+func (i *ipam) reservedAddrs() []string {
 	result := make([]string, 0)
 	for _, zone := range i.zones {
 		for addr := range zone.storage.Reserved {
@@ -283,13 +281,13 @@ func (i *ipam) reservedAddrs(ctx context.Context) []string {
 	return result
 }
 
-func (i *ipam) ReservedAddrs(ctx context.Context) []string {
+func (i *ipam) ReservedAddrs() []string {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
-	return i.reservedAddrs(ctx)
+	return i.reservedAddrs()
 }
 
-func (i *ipam) AllocAddrSpecific(ctx context.Context, specific string, labels LabelMap) error {
+func (i *ipam) AllocAddrSpecific(specific string, labels LabelMap) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
@@ -312,7 +310,7 @@ func (i *ipam) AllocAddrSpecific(ctx context.Context, specific string, labels La
 	return fmt.Errorf("IP %s is not handled", specific)
 }
 
-func (i *ipam) AllocAddrNext(ctx context.Context, labels LabelMap) (net.IP, error) {
+func (i *ipam) AllocAddrNext(labels LabelMap) (net.IP, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
@@ -328,7 +326,7 @@ func (i *ipam) AllocAddrNext(ctx context.Context, labels LabelMap) (net.IP, erro
 	return nil, errors.New("No remained IP to allocate")
 }
 
-func (i *ipam) ReserveAddr(ctx context.Context, specific string, labels LabelMap) error {
+func (i *ipam) ReserveAddr(specific string, labels LabelMap) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
@@ -357,7 +355,7 @@ func (i *ipam) ReserveAddr(ctx context.Context, specific string, labels LabelMap
 	return fmt.Errorf("IP %s is not handled", specific)
 }
 
-func (i *ipam) ReleaseAddr(ctx context.Context, specific string) error {
+func (i *ipam) ReleaseAddr(specific string) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
@@ -375,7 +373,7 @@ func (i *ipam) ReleaseAddr(ctx context.Context, specific string) error {
 	return fmt.Errorf("IP %s is not handled", specific)
 }
 
-func (i *ipam) SetAddrLabel(ctx context.Context, specific, key, value string) error {
+func (i *ipam) SetAddrLabel(specific, key, value string) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
@@ -390,7 +388,7 @@ func (i *ipam) SetAddrLabel(ctx context.Context, specific, key, value string) er
 	return fmt.Errorf("IP %s not allocated", specific)
 }
 
-func (i *ipam) RemoveAddrLabel(ctx context.Context, specific, key string) error {
+func (i *ipam) RemoveAddrLabel(specific, key string) error {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
@@ -405,7 +403,7 @@ func (i *ipam) RemoveAddrLabel(ctx context.Context, specific, key string) error 
 	return fmt.Errorf("IP %s not allocated", specific)
 }
 
-func (i *ipam) AddrLabels(ctx context.Context, specific string) (LabelMap, error) {
+func (i *ipam) AddrLabels(specific string) (LabelMap, error) {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return nil, fmt.Errorf("Invalid IP format %s", specific)
@@ -420,7 +418,7 @@ func (i *ipam) AddrLabels(ctx context.Context, specific string) (LabelMap, error
 	return nil, fmt.Errorf("IP %s not allocated", specific)
 }
 
-func (i *ipam) FindLiteral(ctx context.Context, specific string) string {
+func (i *ipam) FindLiteral(specific string) string {
 	ip := net.ParseIP(specific)
 	if ip == nil {
 		return ""
@@ -435,7 +433,7 @@ func (i *ipam) FindLiteral(ctx context.Context, specific string) string {
 	return ""
 }
 
-func (i *ipam) Literals(ctx context.Context) []string {
+func (i *ipam) Literals() []string {
 	results := make([]string, 0)
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -445,7 +443,7 @@ func (i *ipam) Literals(ctx context.Context) []string {
 	return results
 }
 
-func (i *ipam) Dump(ctx context.Context, fat bool) ([]byte, error) {
+func (i *ipam) Dump(fat bool) ([]byte, error) {
 	var resize func(*zone) *Zone
 	if fat {
 		resize = func(zone *zone) *Zone {
@@ -486,7 +484,7 @@ func (i *ipam) Dump(ctx context.Context, fat bool) ([]byte, error) {
 	return block.Marshal()
 }
 
-func (i *ipam) DumpZoneAddrs(ctx context.Context, literal string, onlyKeys bool) (map[string][]byte, error) {
+func (i *ipam) DumpZoneAddrs(literal string, onlyKeys bool) (map[string][]byte, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
@@ -580,7 +578,7 @@ func (i *ipam) loadZone(z *Zone, lazy bool) error {
 	return nil
 }
 
-func (i *ipam) Load(ctx context.Context, raw []byte) error {
+func (i *ipam) Load(raw []byte) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	block := &Block{}
@@ -601,7 +599,7 @@ func (i *ipam) Load(ctx context.Context, raw []byte) error {
 	return nil
 }
 
-func (i *ipam) LoadZoneAddrs(ctx context.Context, literal string, addrs map[string][]byte, force bool) error {
+func (i *ipam) LoadZoneAddrs(literal string, addrs map[string][]byte, force bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]

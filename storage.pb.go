@@ -22,7 +22,6 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-// IP地址描述符
 type Descriptor struct {
 	Labels               map[string]string `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	RefCount             uint32            `protobuf:"varint,2,opt,name=ref_count,json=refCount,proto3" json:"ref_count,omitempty"`
@@ -78,7 +77,7 @@ func (m *Descriptor) GetRefCount() uint32 {
 	return 0
 }
 
-// IP地址桶，用于多个IP独立存储，最大IP容量上限
+// IP addr bucket, save addrs and ther descriptor
 type Bucket struct {
 	Used                 map[string]*Descriptor `protobuf:"bytes,1,rep,name=used,proto3" json:"used,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
@@ -129,7 +128,7 @@ func (m *Bucket) GetUsed() map[string]*Descriptor {
 type Zone struct {
 	Literal string            `protobuf:"bytes,1,opt,name=literal,proto3" json:"literal,omitempty"`
 	Labels  map[string]string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// bucket的索引映射，其中key为bucket的索引
+	// Map key is the index of bucket
 	Buckets              map[string]*Bucket     `protobuf:"bytes,3,rep,name=buckets,proto3" json:"buckets,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	Reserved             map[string]*Descriptor `protobuf:"bytes,4,rep,name=reserved,proto3" json:"reserved,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
