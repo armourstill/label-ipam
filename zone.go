@@ -75,7 +75,7 @@ func (z *zone) RemoveAddrLabel(ip net.IP, key string) bool {
 	return false
 }
 
-func (z *zone) ReserveAddr(ip net.IP, desc *Descriptor) {
+func (z *zone) ReserveAddr(_ net.IP, _ *Descriptor) {
 	if z.storage.Reserved == nil {
 		z.storage.Reserved = make(map[string]*Descriptor)
 	}
