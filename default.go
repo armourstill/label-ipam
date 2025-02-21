@@ -6,13 +6,12 @@ import (
 	"math/big"
 	"net"
 	"strings"
-	"sync"
 )
 
 var one = big.NewInt(1)
 
 type ipam struct {
-	mutex  sync.RWMutex
+	// mutex  sync.RWMutex
 	prefix string
 	zones  map[string]*zone
 	labels LabelMap
@@ -29,22 +28,16 @@ func New(prefix string, labels LabelMap) IPAM {
 }
 
 func (i *ipam) SetLabel(key, value string) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	i.labels[key] = value
 }
 
 func (i *ipam) RemoveLabel(key string) (string, bool) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	value, ok := i.labels[key]
 	delete(i.labels, key)
 	return value, ok
 }
 
 func (i *ipam) Labels() LabelMap {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	if i.labels == nil {
 		return nil
 	}
@@ -129,9 +122,6 @@ func (i *ipam) createZoneRange(low, high net.IP, lazy bool) *zone {
 }
 
 func (i *ipam) AddZone(literal string, lazy bool) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
 	if _, ok := i.zones[literal]; ok {
 		return fmt.Errorf("Zone literal %s already exitst", literal)
 	}
@@ -170,8 +160,6 @@ func (i *ipam) AddZone(literal string, lazy bool) error {
 }
 
 func (i *ipam) SetZoneLabel(literal, key, value string) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	zone, ok := i.zones[strings.ToLower(literal)]
 	if !ok {
 		return fmt.Errorf("IP literal %s not exists", literal)
@@ -205,16 +193,12 @@ func (i *ipam) RemoveZone(literal string) error {
 	return errors.New("Invalid literal format")
 
 del:
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	delete(i.zones, literal)
 
 	return nil
 }
 
 func (i *ipam) RemoveZoneLabel(literal, key string) (string, bool) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
 	if !zoneOk {
 		return "", zoneOk
@@ -225,8 +209,6 @@ func (i *ipam) RemoveZoneLabel(literal, key string) (string, bool) {
 }
 
 func (i *ipam) ZoneLabels(literal string) (LabelMap, bool) {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
 	if !zoneOk {
 		return nil, zoneOk
@@ -238,8 +220,6 @@ func (i *ipam) ZoneLabels(literal string) (LabelMap, bool) {
 }
 
 func (i *ipam) IdleCount() string {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	usedCount := big.NewInt(int64(len(i.usedAddrs())))
 	reservedCount := big.NewInt(int64(len(i.reservedAddrs())))
 	totalCount := big.NewInt(0)
@@ -265,8 +245,6 @@ func (i *ipam) usedAddrs() []string {
 }
 
 func (i *ipam) UsedAddrs() []string {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	return i.usedAddrs()
 }
 
@@ -282,8 +260,6 @@ func (i *ipam) reservedAddrs() []string {
 }
 
 func (i *ipam) ReservedAddrs() []string {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	return i.reservedAddrs()
 }
 
@@ -292,8 +268,6 @@ func (i *ipam) AllocAddrSpecific(specific string, labels LabelMap) error {
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		if (IsIPv4(ip) && zone.version == 6) || (!IsIPv4(ip) && zone.version == 4) {
 			continue
@@ -311,8 +285,6 @@ func (i *ipam) AllocAddrSpecific(specific string, labels LabelMap) error {
 }
 
 func (i *ipam) AllocAddrNext(labels LabelMap) (net.IP, error) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		for tmp := new(big.Int).Add(zone.start, big.NewInt(0)); tmp.Cmp(zone.end) <= 0; tmp.Add(tmp, one) {
 			ip := BigIntToIP(tmp, zone.version)
@@ -331,8 +303,6 @@ func (i *ipam) ReserveAddr(specific string, labels LabelMap) error {
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		if (IsIPv4(ip) && zone.version == 6) || (!IsIPv4(ip) && zone.version == 4) {
 			continue
@@ -360,8 +330,6 @@ func (i *ipam) ReleaseAddr(specific string) error {
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		if !zone.Contains(ip) {
 			continue
@@ -378,8 +346,6 @@ func (i *ipam) SetAddrLabel(specific, key, value string) error {
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		if zone.SetAddrLabel(ip, key, value) {
 			return nil
@@ -393,8 +359,6 @@ func (i *ipam) RemoveAddrLabel(specific, key string) error {
 	if ip == nil {
 		return fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	for _, zone := range i.zones {
 		if zone.RemoveAddrLabel(ip, key) {
 			return nil
@@ -408,8 +372,6 @@ func (i *ipam) AddrLabels(specific string) (LabelMap, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("Invalid IP format %s", specific)
 	}
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	for _, zone := range i.zones {
 		if desc, ok := zone.GetAddrDesc(ip); ok {
 			return LabelMap(desc.Labels).Copy(), nil
@@ -423,8 +385,6 @@ func (i *ipam) FindLiteral(specific string) string {
 	if ip == nil {
 		return ""
 	}
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	for _, zone := range i.zones {
 		if zone.Contains(ip) {
 			return zone.storage.Literal
@@ -435,8 +395,6 @@ func (i *ipam) FindLiteral(specific string) string {
 
 func (i *ipam) Literals() []string {
 	results := make([]string, 0)
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	for _, zone := range i.zones {
 		results = append(results, zone.storage.Literal)
 	}
@@ -471,8 +429,6 @@ func (i *ipam) Dump(fat bool) ([]byte, error) {
 			}
 		}
 	}
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	// 生成一个Block，把所有zone对应的Zone放入Block，最后做Marshal
 	block := &Block{
 		Labels: i.labels.Copy(),
@@ -485,8 +441,6 @@ func (i *ipam) Dump(fat bool) ([]byte, error) {
 }
 
 func (i *ipam) DumpZoneAddrs(literal string, onlyKeys bool) (map[string][]byte, error) {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
 	if !zoneOk {
 		return nil, fmt.Errorf("IP Lliteral %s not exists", literal)
@@ -579,8 +533,6 @@ func (i *ipam) loadZone(z *Zone, lazy bool) error {
 }
 
 func (i *ipam) Load(raw []byte) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	block := &Block{}
 	if err := block.Unmarshal(raw); err != nil {
 		return err
@@ -600,8 +552,6 @@ func (i *ipam) Load(raw []byte) error {
 }
 
 func (i *ipam) LoadZoneAddrs(literal string, addrs map[string][]byte, force bool) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
 	zone, zoneOk := i.zones[strings.ToLower(literal)]
 	if !zoneOk {
 		return fmt.Errorf("IP Lliteral %s not exists", literal)
